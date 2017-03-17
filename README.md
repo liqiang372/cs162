@@ -3,6 +3,11 @@
 
 ## Setup
 ### Mac OS X
+in the VM folder (~/documents/cs162-vm/), 
+- `vagrant up` to set up VM. if this fails, use `vagrant provision` to fix
+- `vagrant halt` to stop the VM.
+next time to run VM, just `vagrant up` + `vagrant ssh`.
+
 > see section1_tools
 1. Open Finder
 2. In the menu bar, select `Go` -> `Connect to Server...`
