@@ -10,7 +10,8 @@ int main(void) {
     }
 }
 ```
-Answer: 3
+Answer: 7, (8 including the original process)
+![fork](./images/fork.png)
 
 ### 3.2 Stack Allocation
 
@@ -26,7 +27,7 @@ int main(void) {
 }
 ```
 Answer: 
-
+since the entire address space is copied stuff will still remain the same
 ```
 stuff is 7 // output by parent process
 stuff is 7 // output by child process
@@ -44,6 +45,7 @@ int main(void) {
         *stuff = 6
 }
 ```
+since the entire address space is copied stuff will still remain the same
 
 Answer: 
 ```
@@ -80,24 +82,15 @@ int main() {
             }
         }
     }
+    printTenNumbers(arr);
 
 }
 ```
 
 output is 
 
-```
-arr 0 is 0
-arr 1 is 1
-arr 2 is 2
-arr 3 is 3
-arr 4 is 4
-arr 5 is 5
-arr 6 is 6
-arr 7 is 7
-arr 8 is 0
-arr 9 is -1342177280
-```
+01234567 (possibe segmentfault) for child, because the array was not allocated to hold 10 integers when `fork()` was called.
+0123456789 for parent.
 
 ### 3.5 Simple Wait
 
@@ -147,8 +140,88 @@ int main(void) {
 }
 ```
 
+### 3.6 Fork and File Descriptors
+What will be stored in the file "output.txt" ?
+
+```c
+int main(void) {
+    int fd;
+    fd = open("output.txt", O_CREATE|O_TRUNC|O_WRONLY, 0666);
+
+    if (!fork()) {
+        write(fd, "hello ", 6);
+    } else {
+        int status;
+
+        wait(&status);
+        write(fd, "world\n", 6);
+    }
+}
+```
+write to file using multi processeas
+File descriptors are copied and point to the same underlying file sctructure in the kernel's open file table.
+
+if current process is child process, write "hello".
+if parent process, wait child process to complete, and write "world"
+
+### 3.7 Exec
+What will C print?
+
+```c
+int main(void) {
+    char** argv = (char**) malloc(3*sizeof(char*));
+    argv[0] = "bin/ls";
+    argv[1] = ".";
+    argv[2] = NULL;
+    for (int i = 0; i < 10; i++) {
+        printf("%d\n", i);
+        if (i == 3)
+            execv("/bin/ls", argv);
+    }
+}
+```
+
+### 3.8 Exec + Fork 
+How would I modify the above program using fork so it both prints the output of ls and all the numbers from 0 to 9(order does not matter)? You may not remove lines from the original programl only add statements(and use fork!o
+
+```c
+int main(void) {
+    char** argv = (char**) malloc(3*sizeof(char*));
+    argv[0] = "bin/ls";
+    argv[1] = ".";
+    argv[2] = NULL;
+    for (int i = 0; i < 10; i++) {
+        printf("%d\n", i);
+        if (i == 3) {
+            pid_t pid = fork();
+            if (pid == 0)
+                execv("/bin/ls", argv);
+        }
+            
+    }
+}
+```
+
+
+### 3.9 Implementing fork() efficiently (Design)
+Remember fork() makes the child process's address space exactly the same as its parent's. If you were designing an OS, list some steps you would take to make this address space copy more efficiento?
+
+1. Program calls `fork()` system call
+2. Kernal fork system call duplicates the process running the program
+3. The kernel sets the return value for the system call for the original program and for the duplicate (PID of the duplicate and 0, respectively)
+4. The kernel puts both processes in the scheduler queue
+5. As each process is scheduled, the kernel 'returns' to each of the two programs
+
+
+Copying the entire address space would take a long time.
+So a more efficient method is `copy-on-write`
+Initially do not copy anything. Write new pages and update address mapping as and when the child modifies its address space.
+
+
 ## Questions
 - [cast the result of malloc](http://stackoverflow.com/questions/605845/do-i-cast-the-result-of-malloc)
 - [why is not fork bomb](http://stackoverflow.com/questions/13635854/why-doesnt-this-cause-a-fork-bomb)
 - [The wait system call](http://www.csl.mtu.edu/cs4411.ck/www/NOTES/process/fork/wait.html)
-- [Notes on wait & waitpid](https://webdocs.cs.ualberta.ca/~tony/C379/C379Labs/Lab3/wait.html)
+- [Notes on wait & waitpid](https://webdocs.cs.ualberta.ca/~tony/C379/C379Labs/Lab3/wait.htmlo)
+- [what is flush doing](http://stackoverflow.com/questions/7127075/what-exactly-the-pythons-file-flush-is-doing)
+
